@@ -122,6 +122,8 @@ d1 = file_no_outlier %>%
 ## Plot the downsampled data. You can use the code from the slides
 ggplot(data = d1) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
+outlier <- mean(df$Resp1, na.rm = T) - 2.5*sd(df$Resp1, na.rm = T)
+outlier
 filename <- "Study1_G2_T1_TurnTaking.csv"
 
 ## Now add the group, trial, condition to the cleaned up, scaled, downsampled data
@@ -154,9 +156,8 @@ A couple of tips:
 
 ```{r}
 # Define a function running the loading, artifact removal, scaling, downsampling, info adding.
-?read_delim
 
-data_preprocess <- function(filename, threshold){
+data_preprocess <- function(filename){
   myfiles = read_delim(paste0("data/",filename), delim = ",")
   vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
   vars = as.data.frame(vars)
@@ -173,14 +174,6 @@ data_preprocess <- function(filename, threshold){
       Resp1 = mean(Resp1,na.rm=T),
       Resp2 = mean(Resp2,na.rm=T),
       rowname = rowname[1])
-  myfiles$HR1 <- removeOuts(myfiles$HR1, threshold)
-  myfiles$HR2 <- removeOuts(myfiles$HR2, threshold)
-  myfiles$Resp1 <- removeOuts(myfiles$Resp1, threshold)
-  myfiles$Resp2 <- removeOuts(myfiles$Resp2, threshold)
-  myfiles$HR1_new <- scale(myfiles$HR1)
-  myfiles$HR2_new <- scale(myfiles$HR2)
-  myfiles$Resp1_new <- scale(myfiles$Resp1)
-  myfiles$Resp2_new <- scale(myfiles$Resp2)
   myfiles <- cbind(myfiles, vars)
   # To be filled in
   
@@ -192,14 +185,21 @@ data_preprocess <- function(filename, threshold){
 
 # Run the function on the whole dataset using map_df
 df <- list.files(path = "data/", pattern=".csv") %>% 
-  purrr::map_df(data_preprocess, 2.5)
-write_csv(df, "port4_data.csv")
+  purrr::map_df(data_preprocess)
 
-
-?read_delim
-view(df)
 # Now we need to make sure all the data are meaningful or something has to be removed
 # E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
+
+threshold = 2.5
+df <- df %>% 
+  mutate(HR1 = removeOuts(df$HR1, threshold),
+        HR2 = removeOuts(df$HR2, threshold),
+        Resp1 = removeOuts(df$Resp1, threshold),
+        Resp2 = removeOuts(df$Resp2, threshold),
+        HR1_new = scale(df$HR1),
+        HR2_new <- scale(df$HR2),
+        Resp1_new <- scale(df$Resp1),
+        Resp2_new <- scale(df$Resp2))
 
 # plots plots plots
 
