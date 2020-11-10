@@ -112,7 +112,7 @@ file_no_outlier$resp2_new <- scale(file_no_outlier$Resp2)
 
 # Plot again to check how scaled data look like
 ggplot(data = file_no_outlier) + geom_path(aes(time, HR1_new, color = "P1")) + geom_path(aes(time, HR2_new, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
-?group
+
 ## Downsample
 ### You can use the code below. It is almost the same as the one in the video lecture.
 d1 = file_no_outlier %>%
