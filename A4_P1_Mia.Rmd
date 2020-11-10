@@ -54,7 +54,7 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 
 ```{r}
 # Load the libraries
-pacman::p_load(tidyverse, ggpubr)
+pacman::p_load(tidyverse, ggpubr, groupdata2)
 # Load the file
 file <- read.csv("data/Study1_G2_T1_TurnTaking.csv")
 
@@ -78,6 +78,9 @@ file_no_outlier <- file
 
 file_no_outlier$HR1 <- removeOuts(file_no_outlier$HR1, threshold)
 file_no_outlier$HR2 <- removeOuts(file_no_outlier$HR2, threshold)
+file_no_outlier$Resp1 <- removeOuts(file_no_outlier$Resp1, threshold)
+file_no_outlier$Resp2 <- removeOuts(file_no_outlier$Resp2, threshold)
+
 
 # Plot raw data against those with the artifacts removed
 removed <- ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
@@ -89,6 +92,8 @@ ggpubr::ggarrange(raw, removed, labels = c("raw", "outliers removed" ))
 ## Scale
 file_no_outlier$HR1_new <- scale(file_no_outlier$HR1)
 file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
+file_no_outlier$Resp1_new <- scale(file_no_outlier$Resp1)
+file_no_outlier$Resp2_new <- scale(file_no_outlier$Resp2)
 
 
 
@@ -99,34 +104,36 @@ file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
 
 # Plot again to check how scaled data look like
 ggplot(data = file_no_outlier) + geom_path(aes(time, HR1_new, color = "P1")) + geom_path(aes(time, HR2_new, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
-# Plot raw data against those with the artifacts removed
 
-
-## Scale
-### Tip: if scale() gives some issues, try the one below
-#z_scale <- function(column){
-#  column_c <- (column - mean(column)) / sd(column)
-#}
-
-# Plot again to check how scaled data look like
-
+file_no_outlier$rowname <- row.names(file_no_outlier)
 
 ## Downsample
 ### You can use the code below. It is almost the same as the one in the video lecture.
-#d1 = d %>%
-#  group(n = 100, method = 'greedy') %>%
-#  dplyr::summarise(
-#    time = mean(time,na.rm=T),
-#    HR1 = mean(HR1S,na.rm=T),
-#    HR2 = mean(HR2S,na.rm=T),
-#    Resp1 = mean(Resp1S,na.rm=T),
-#    Resp2 = mean(Resp2S,na.rm=T),
-#    rowname = rowname[1]) #the index we use to put them back together 
+d1 = file_no_outlier %>%
+  group(n = 100, method = 'greedy') %>%
+  dplyr::summarise(
+    time = mean(time,na.rm=T),
+    HR1 = mean(HR1_new,na.rm=T),
+    HR2 = mean(HR2_new,na.rm=T),
+    Resp1 = mean(Resp1_new,na.rm=T),
+    Resp2 = mean(Resp2_new,na.rm=T),
+    rowname = rowname[1]) #the index we use to put them back together 
 
 ## Plot the downsampled data. You can use the code from the slides
+ggplot(data = d1) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
+filename <- "Study1_G2_T1_TurnTaking.csv"
 
 ## Now add the group, trial, condition to the cleaned up, scaled, downsampled data
+#parse filename; study, diagnosis, subject, trial
+vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+vars = as.data.frame(vars)
+names(vars) = c("filename", "study","group","trial", "condition")
+vars <- vars %>% 
+  mutate(group_id = paste0(study, group))
+
+#combining dataframes
+d1 <- cbind(d1, vars)
 
 ## Tip the info is in the file name
 
