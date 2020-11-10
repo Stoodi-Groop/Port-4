@@ -128,7 +128,7 @@ filename <- "Study1_G2_T1_TurnTaking.csv"
 #parse filename; study, diagnosis, subject, trial
 vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
 vars = as.data.frame(vars)
-names(vars) = c("filename", "study","group","trial", "condition")
+names(vars) = c("filename","study","group","trial", "condition")
 vars <- vars %>% 
   mutate(group_id = paste0(study, group))
 
@@ -155,10 +155,34 @@ A couple of tips:
 ```{r}
 # Define a function running the loading, artifact removal, scaling, downsampling, info adding.
 
-data_preprocess <- function(filename, threshold = 2.5){
-  files = list.files(pattern="*.csv")
+data_preprocess <- function(filename){
+  threshold = 2.5
+  files = list.files(path = "data/", pattern=".csv")
   myfiles = lapply(files, read_csv)
-  
+  vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+  vars = as.data.frame(vars)
+  names(vars) = c("filename","study","group","trial", "condition")
+  vars <- vars %>% 
+    mutate(group_id = paste0(study, group))
+  myfiles$rowname <- row.names(myfiles)
+  # myfiles = myfiles %>%
+  #   group(n = 100, method = 'greedy') %>%
+  #   dplyr::summarise(
+  #     time = mean(time,na.rm=T),
+  #     HR1 = mean(HR1,na.rm=T),
+  #     HR2 = mean(HR2,na.rm=T),
+  #     Resp1 = mean(Resp1,na.rm=T),
+  #     Resp2 = mean(Resp2,na.rm=T),
+  #     rowname = rowname[1])
+  # myfiles$HR1 <- removeOuts(myfiles$HR1, threshold)
+  # myfiles$HR2 <- removeOuts(myfiles$HR2, threshold)
+  # myfiles$Resp1 <- removeOuts(myfiles$Resp1, threshold)
+  # myfiles$Resp2 <- removeOuts(myfiles$Resp2, threshold)
+  # myfiles$HR1_new <- scale(myfiles$HR1)
+  # myfiles$HR2_new <- scale(myfiles$HR2)
+  # myfiles$Resp1_new <- scale(myfiles$Resp1)
+  # myfiles$Resp2_new <- scale(myfiles$Resp2)
+  d1 <- cbind(d1, vars)
   # To be filled in
   
   return(d1)
@@ -168,8 +192,10 @@ data_preprocess <- function(filename, threshold = 2.5){
 #  Identify all files to be read
 
 # Run the function on the whole dataset using map_df
+df <- list.files(path = "data/", pattern=".csv") %>% 
+  purrr::map_df(data_preprocess, )
+write_csv(df, "port4_data.csv")
 
-         
 # Now we need to make sure all the data are meaningful or something has to be removed
 # E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
 
