@@ -54,11 +54,14 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 
 ```{r}
 # Load the libraries
-#install.packages("RHRV")
-library(RHRV)
+library(RHRV) 
+library(tidyverse)
 # Load the file
+file <- read.csv("Data/Study1_G2_T1_TurnTaking.csv")
+
 # Plot
 
+ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
 
 
 ### Tip, check the function below. This is the function explained in the video lecture
@@ -71,18 +74,31 @@ removeOuts <- function(ts,threshold){
 }
 threshold=2.5 # Default value at 2.5 sds from the mean. But you can increase it, if you want.
 
+file_no_outlier <- file
+
+file_no_outlier$HR1 <- removeOuts(file_no_outlier$HR1, threshold)
+file_no_outlier$HR2 <- removeOuts(file_no_outlier$HR2, threshold)
 
 # Plot raw data against those with the artifacts removed
+ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
+
+ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
+
 
 
 ## Scale
+file_no_outlier$HR1_new <- scale(file_no_outlier$HR1)
+file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
+
+
+
 ### Tip: if scale() gives some issues, try the one below
 #z_scale <- function(column){
 #  column_c <- (column - mean(column)) / sd(column)
 #}
 
 # Plot again to check how scaled data look like
-
+ggplot(data = file_no_outlier) + geom_path(aes(time, HR1_new, color = "P1")) + geom_path(aes(time, HR2_new, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
 ## Downsample
 ### You can use the code below. It is almost the same as the one in the video lecture.
@@ -122,12 +138,41 @@ A couple of tips:
 # Define a function running the loading, artifact removal, scaling, downsampling, info adding.
 
 data_preprocess <- function(filename, threshold = 2.5){
-  
+  df <- read_csv("Data/Study*.csv")
   # To be filled in
   
   return(d1)
 
 }
+
+?read_csv
+
+
+getwd()
+
+#function to load and clean data
+read_pitch <- function(filename) {
+  #read data
+  d <- read_delim(paste0("Pitch/",filename), delim = "\t")
+  #parse filename; study, diagnosis, subject, trial
+  vars = str_match(filename,"Study(\\d+)D([01])S(\\d+)T(\\d+)")
+  vars = as.data.frame(t(vars[2:length(vars)]))
+  names(vars) = c("study","diagnosis","subject","trial")
+  #extract descriptors
+  mean <- mean(d$f0)
+  sd <- sd(d$f0)
+  min <- min(d$f0)
+  max <- max(d$f0)
+  median <- median(d$f0)
+  iqr <- IQR(d$f0) #InterQuartile Range
+  mad <- mad(d$f0) #Median absolute deviation
+  range <- max(d$f0) -  min(d$f0)
+  coefvar <- sd(d$f0)/mean(d$f0) #Coefficient variation
+  d <- cbind(vars,data.frame(mean, sd, min, max, median, iqr, mad, coefvar))
+  #combine all this data
+  return(d)
+}
+
 
 #  Identify all files to be read
 
