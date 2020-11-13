@@ -54,7 +54,7 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 
 ```{r}
 # Load the libraries
-pacman::p_load(tidyverse, ggpubr, groupdata2)
+pacman::p_load(tidyverse, ggpubr, groupdata2, tidyr, mosaic)
 # Load the file
 file <- read.csv("data/Study1_G2_T1_TurnTaking.csv")
 
@@ -286,27 +286,76 @@ df <- df %>%
 ```{r}
 # Make the data long, so we can analyze both participants at the same time. Tip: you can use the function gather () 
 ## N.B. This is a bit tricky and you might have to do it in several steps
-df_hr <- df %>% 
-  pivot_longer(cols = starts_with("HR") & ends_with("led"), names_to = "participant", values_to = "HR_self") 
 
-df_resp <- df %>% 
-  pivot_longer(cols = starts_with("Re") & ends_with("led"), names_to = "participant", values_to = "Resp_self") 
+#making the self and other HR column 
+hr_self <- pivot_longer(df, c(HR1_scaled,HR2_scaled), names_to = "participant", values_to = "HR_self") 
+hr_other <- pivot_longer(df, c(HR2_scaled,HR1_scaled), values_to = "HR_other") 
 
-df_hr_change <- df %>% 
-  pivot_longer(cols = starts_with("HR") & ends_with("change"), names_to = "participant", values_to = "HR_change_self")
+#adding to a main dataframe 
+df_long <- cbind(hr_self, HR_other = hr_other$HR_other)
 
-df_hr_lag <- df %>% 
-  pivot_longer(cols = starts_with("HR") & ends_with("lag"), names_to = "participant", values_to = "HR_lag_self")
+#checking it works 
+head(df_long) 
 
-df_resp_change<- df %>% 
-  pivot_longer(cols = starts_with("Re") & ends_with("change"), names_to = "participant", values_to = "Resp_change_self")
+#making the resp self and resp other data frames
+resp_self <- pivot_longer(df, c(Resp1_scaled, Resp2_scaled), values_to = "Resp_self")
+resp_other <- pivot_longer(df, c(Resp2_scaled, Resp1_scaled), values_to = "Resp_other")
 
-df_resp_lag<- df %>% 
-  pivot_longer(cols = starts_with("Re") & ends_with("lag"), names_to = "participant", values_to = "Resp_lag_self")
+#adding the pivotted columns to the main dataframe 
+df_long <- cbind(df_long, 
+                 Resp_self = resp_self$Resp_self, 
+                 Resp_other = resp_other$Resp_other)
 
-df_long <- merge(df, df_resp, df_hr, df_hr_change, df_resp_change, df_hr_lag, df_resp_lag, by = ) 
+#checking it works
+head(df_long)
 
-?merge
+
+#now we do it with hr change self and hr change other
+hr_change <- pivot_longer(df, c(HR1_change, HR2_change), values_to = "HR_change_self")
+hr_change_other <- pivot_longer(df, c(HR2_change, HR1_change), values_to = "HR_change_other")
+
+#adding to df
+df_long <- cbind(df_long, 
+                 HR_change_self = hr_change$HR_change_self, 
+                 HR_change_other = hr_change_other$HR_change_other)
+
+#now we do it with resp change self and other
+resp_change <- pivot_longer(df, c(Resp1_change, Resp2_change), values_to = "Resp_change_self")
+resp_change_other <- pivot_longer(df, c(Resp2_change, Resp1_change), values_to = "Resp_change_other")
+
+#adding to df
+df_long <- cbind(df_long, 
+                 Resp_change_self = resp_change$Resp_change_self, 
+                 Resp_change_other = resp_change_other$Resp_change_other)
+
+#checking it works
+head(df_long)
+
+
+#now it's time for hr lag self and hr lag other 
+hr_lag <- pivot_longer(df, c(HR1_lag, HR2_lag), values_to = "HR_lag_self")
+hr_lag_other <- pivot_longer(df, c(HR2_lag, HR1_lag), values_to = "HR_lag_other")
+
+#adding to df
+df_long <- cbind(df_long, 
+                 HR_lag_self = hr_lag$HR_lag_self, 
+                 HR_lag_other = hr_lag_other$HR_lag_other)
+
+#and finally resp lag self and resp lag other 
+resp_lag <- pivot_longer(df, c(Resp1_lag, Resp2_lag), values_to = "Resp_lag_self")
+resp_lag_other <- pivot_longer(df, c(Resp2_lag, Resp1_lag), values_to = "Resp_lag_other")
+
+#adding to df
+df_long <- cbind(df_long, 
+                 Resp_lag_self = resp_lag$Resp_lag_self, 
+                 Resp_lag_other = resp_lag_other$Resp_lag_other)
+
+  
+
+#making a nice participant column with unique numbers for each participant 
+df_long <- df_long %>% 
+  mutate(participant = paste0(group_id, str_extract(participant, ("\\d"))))
+
 # Set the most interesting contrast e.g. by defining synchronous or conversation as the baseline
 
 # Model change as a function of own and other previous state 
