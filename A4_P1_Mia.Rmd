@@ -54,7 +54,7 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 
 ```{r}
 # Load the libraries
-pacman::p_load(tidyverse, ggpubr, groupdata2, tidyr, mosaic)
+pacman::p_load(tidyverse, ggpubr, groupdata2)
 # Load the file
 file <- read.csv("data/Study1_G2_T1_TurnTaking.csv")
 
@@ -355,6 +355,9 @@ df_long <- cbind(df_long,
 #making a nice participant column with unique numbers for each participant 
 df_long <- df_long %>% 
   mutate(participant = paste0(group_id, str_extract(participant, ("\\d"))))
+
+
+write_csv(df_long, "longboi.csv")
 
 # Set the most interesting contrast e.g. by defining synchronous or conversation as the baseline
 
