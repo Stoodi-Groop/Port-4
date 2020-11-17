@@ -56,6 +56,8 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 # Load the libraries
 library(RHRV) 
 library(tidyverse)
+library(ggpubr)
+library(groupdata2)
 # Load the file
 file <- read.csv("Data/Study1_G2_T1_TurnTaking.csv")
 
@@ -72,24 +74,29 @@ removeOuts <- function(ts,threshold){
              (threshold*sd(ts,na.rm=T)))] = mean(ts,na.rm=T)
   return(ts)
 }
+
 threshold=2.5 # Default value at 2.5 sds from the mean. But you can increase it, if you want.
 
 file_no_outlier <- file
 
 file_no_outlier$HR1 <- removeOuts(file_no_outlier$HR1, threshold)
 file_no_outlier$HR2 <- removeOuts(file_no_outlier$HR2, threshold)
+file_no_outlier$Resp1 <- removeOuts(file_no_outlier$Resp1, threshold)
+file_no_outlier$Resp2 <- removeOuts(file_no_outlier$Resp2, threshold)
+
 
 # Plot raw data against those with the artifacts removed
-ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
+removed <- ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
-ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
+raw <- ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
 
-
+ggpubr::ggarrange(raw, removed, labels = c("raw", "outliers removed" ))
 
 ## Scale
 file_no_outlier$HR1_new <- scale(file_no_outlier$HR1)
 file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
-
+file_no_outlier$Resp1_new <- scale(file_no_outlier$Resp1)
+file_no_outlier$Resp2_new <- scale(file_no_outlier$Resp2)
 
 
 ### Tip: if scale() gives some issues, try the one below
@@ -101,23 +108,38 @@ file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
 ggplot(data = file_no_outlier) + geom_path(aes(time, HR1_new, color = "P1")) + geom_path(aes(time, HR2_new, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
 ## Downsample
+file_no_outlier$rowname <- row.names(file_no_outlier)
 ### You can use the code below. It is almost the same as the one in the video lecture.
-#d1 = d %>%
-#  group(n = 100, method = 'greedy') %>%
-#  dplyr::summarise(
-#    time = mean(time,na.rm=T),
-#    HR1 = mean(HR1S,na.rm=T),
-#    HR2 = mean(HR2S,na.rm=T),
-#    Resp1 = mean(Resp1S,na.rm=T),
-#    Resp2 = mean(Resp2S,na.rm=T),
-#    rowname = rowname[1]) #the index we use to put them back together 
+d1 = file_no_outlier %>%
+  group(n = 100, method = 'greedy') %>%
+  dplyr::summarise(
+    time = mean(time,na.rm=T),
+    HR1 = mean(HR1_new,na.rm=T),
+    HR2 = mean(HR2_new,na.rm=T),
+    Resp1 = mean(Resp1_new,na.rm=T),
+    Resp2 = mean(Resp2_new,na.rm=T),
+    rowname = rowname[1]) #the index we use to put them back together 
 
 ## Plot the downsampled data. You can use the code from the slides
 
+ggplot(data = d1) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
+
+
+filename <- "Study1_G2_T1_TurnTaking.csv"
 
 ## Now add the group, trial, condition to the cleaned up, scaled, downsampled data
+#parse filename; study, diagnosis, subject, trial
+vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+vars = as.data.frame(vars)
+names(vars) = c("filename", "study","group","trial", "condition")
+vars <- vars %>% 
+  mutate(group_id = paste0(study, group))
 
+#combining dataframes
+d1 <- cbind(d1, vars)
 ## Tip the info is in the file name
+
+
 
 
 ```
@@ -134,59 +156,110 @@ A couple of tips:
 - you need to make sure all the data are meaningful or something has to be removed. Plotting is your friend. E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
 
 
+
 ```{r}
 # Define a function running the loading, artifact removal, scaling, downsampling, info adding.
 
-data_preprocess <- function(filename, threshold = 2.5){
-  df <- read_csv("Data/Study*.csv")
-  # To be filled in
+data_preprocess <- function(filename, threshold){
+  myfiles = read_delim(paste0("Data/",filename), delim = ",")
+  vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+  vars = as.data.frame(vars)
+  names(vars) = c("filename","study","group","trial", "condition")
+  vars <- vars %>% 
+    mutate(group_id = paste0(study, group))
+  myfiles$rowname <- row.names(myfiles)
+  myfiles = myfiles %>%
+    group(n = 100, method = 'greedy') %>%
+    dplyr::summarise(
+      time = mean(time,na.rm=T),
+      HR1 = mean(HR1,na.rm=T),
+      HR2 = mean(HR2,na.rm=T),
+      Resp1 = mean(Resp1,na.rm=T),
+      Resp2 = mean(Resp2,na.rm=T),
+      rowname = rowname[1])
+ # myfiles$HR1 <- removeOuts(myfiles$HR1, threshold)
+  #myfiles$HR2 <- removeOuts(myfiles$HR2, threshold)
+  #myfiles$Resp1 <- removeOuts(myfiles$Resp1, threshold)
+  #myfiles$Resp2 <- removeOuts(myfiles$Resp2, threshold)
+  #myfiles$HR1_new <- scale(myfiles$HR1)
+  #myfiles$HR2_new <- scale(myfiles$HR2)
+  #myfiles$Resp1_new <- scale(myfiles$Resp1)
+  #myfiles$Resp2_new <- scale(myfiles$Resp2)
+  myfiles <- cbind(myfiles, vars)
   
-  return(d1)
+  return(myfiles)
 
-}
-
-?read_csv
-
-
-getwd()
-
-#function to load and clean data
-read_pitch <- function(filename) {
-  #read data
-  d <- read_delim(paste0("Pitch/",filename), delim = "\t")
-  #parse filename; study, diagnosis, subject, trial
-  vars = str_match(filename,"Study(\\d+)D([01])S(\\d+)T(\\d+)")
-  vars = as.data.frame(t(vars[2:length(vars)]))
-  names(vars) = c("study","diagnosis","subject","trial")
-  #extract descriptors
-  mean <- mean(d$f0)
-  sd <- sd(d$f0)
-  min <- min(d$f0)
-  max <- max(d$f0)
-  median <- median(d$f0)
-  iqr <- IQR(d$f0) #InterQuartile Range
-  mad <- mad(d$f0) #Median absolute deviation
-  range <- max(d$f0) -  min(d$f0)
-  coefvar <- sd(d$f0)/mean(d$f0) #Coefficient variation
-  d <- cbind(vars,data.frame(mean, sd, min, max, median, iqr, mad, coefvar))
-  #combine all this data
-  return(d)
 }
 
 
 #  Identify all files to be read
 
 # Run the function on the whole dataset using map_df
+df123 <- list.files(path = "Data/", pattern=".csv") %>% 
+  purrr::map_df(data_preprocess, 2.5)
 
-         
-# Now we need to make sure all the data are meaningful or something has to be removed
-# E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
+
+# DOING IT ALL AGAIN FOR STUDY 4 BECAUSE THEIR TIME SCALES ARE STUUUUPID 
+
+data_preprocess4 <- function(filename, threshold){
+  myfiles = read_delim(paste0("Data4/",filename), delim = ",")
+  vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+  vars = as.data.frame(vars)
+  names(vars) = c("filename","study","group","trial", "condition")
+  vars <- vars %>% 
+    mutate(group_id = paste0(study, group))
+  myfiles$rowname <- row.names(myfiles)
+  myfiles = myfiles %>%
+    group(n = 100, method = 'greedy') %>%
+    dplyr::summarise(
+      time = mean(min,na.rm=T),
+      HR1 = mean(HR1,na.rm=T),
+      HR2 = mean(HR2,na.rm=T),
+      Resp1 = mean(Resp1,na.rm=T),
+      Resp2 = mean(Resp2,na.rm=T),
+      rowname = rowname[1])
+  myfiles <- cbind(myfiles, vars)
+
+  return(myfiles)
+
+}
+
+
+#  Identify all files to be read
+
+# Run the function on the whole dataset using map_df
+df4 <- list.files(path = "Data4/", pattern=".csv") %>% 
+  purrr::map_df(data_preprocess4, 2.5)
+
+
+
+
+df <- rbind(df123, df4)
+
+#This is only NA's there we remove it
+df <- df %>% filter(group_id != 27)
+
+#Removing outliers and scaling
+threshold = 2.4
+df <- df %>% 
+  mutate(HR1 = removeOuts(df$HR1, threshold),
+        HR2 = removeOuts(df$HR2, threshold),
+        Resp1 = removeOuts(df$Resp1, threshold),
+        Resp2 = removeOuts(df$Resp2, threshold),
+        HR1_scaled = scale(df$HR1),
+        HR2_scaled = scale(df$HR2),
+        Resp1_scaled = scale(df$Resp1),
+        Resp2_scaled = scale(df$Resp2),
+        time = ifelse(study == 3, time/100000, paste0(time)))
+
+
+# Save the data
+write_csv(df, "port4_data.csv")
+
+
 
 # plots plots plots
 
-# Remove bad data
-
-# Save the data
 
 ```
 
@@ -214,9 +287,29 @@ Bonus question: what if we include an additional layer? Is my heart rate just ad
 
 ```{r}
 
+df <- read_csv("port4_data.csv")
+
 # Generate a column for each: previous HR1, HR2, Resp1, Resp2. Tip: use the function Lag()
+df <- df %>% 
+  group_by(trial, group_id) %>% 
+  mutate(HR1_prev = lag(HR1_scaled),
+         HR2_prev = lag(HR2_scaled),
+         Resp1_prev = lag(Resp1_scaled),
+         Resp2_prev = lag(Resp2_scaled))
+
 # Generate a column for each: change in HR1, HR2, Resp1, Resp2
 
+df <- df %>% 
+  mutate(HR1_change = HR1_scaled - HR1_prev,
+         HR2_change = HR2_scaled - HR2_prev,
+         Resp1_change = Resp1_scaled - Resp1_prev,
+         Resp2_change = Resp2_scaled - Resp2_prev)
+# we say new value minus the previous, so if the change numbers are positive, it means that the hert rate has risen from before. 
+?pivot_longer
+
+df_long <- df %>% 
+  pivot_longer(cols = starts_with("HR") & ends_with("led"), names_to = "participant", values_to = "HR_self") %>% 
+  pivot_longer(cols = starts_with("Re") & ends_with("led"), names_to = "Participant", values_to = "Resp_self")
 
 # Make the data long, so we can analyze both participants at the same time. Tip: you can use the function gather () 
 ## N.B. This is a bit tricky and you might have to do it in several steps
