@@ -66,9 +66,11 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 
 ```{r}
 # Load the libraries
-library(RHRV) 
+#library(RHRV) 
 library(tidyverse)
 library(groupdata2)
+library(lme4)
+library(lmerTest)
 # Load the file
 file <- read.csv("DataPort4/Study1_G2_T1_TurnTaking.csv")
 # Plot
@@ -88,21 +90,17 @@ threshold=2.5 # Default value at 2.5 sds from the mean. But you can increase it,
 
 file_no_outlier <- file
 
-file_no_outlier$HR1 <- removeOuts(file_no_outlier$HR1, threshold)
-file_no_outlier$HR2 <- removeOuts(file_no_outlier$HR2, threshold)
-
+file_no_outlier$HR1_new <- removeOuts(file_no_outlier$HR1, threshold)
+file_no_outlier$HR2_new <- removeOuts(file_no_outlier$HR2, threshold)
+file_no_outlier$Resp1_new <- removeOuts(file_no_outlier$Resp1, threshold)
+file_no_outlier$Resp2_new <- removeOuts(file_no_outlier$Resp2, threshold)
 # Plot raw data against those with the artifacts removed
-ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
-
-ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
-
-
 
 ## Scale
 file_no_outlier$HR1_new <- scale(file_no_outlier$HR1)
 file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
-file_no_outlier$resp1_new <- scale(file_no_outlier$Resp1)
-file_no_outlier$resp2_new <- scale(file_no_outlier$Resp2)
+file_no_outlier$Resp1_new <- scale(file_no_outlier$Resp1)
+file_no_outlier$Resp2_new <- scale(file_no_outlier$Resp2)
 
 
 ### Tip: if scale() gives some issues, try the one below
@@ -111,7 +109,13 @@ file_no_outlier$resp2_new <- scale(file_no_outlier$Resp2)
 #}
 
 # Plot again to check how scaled data look like
-ggplot(data = file_no_outlier) + geom_path(aes(time, HR1_new, color = "P1")) + geom_path(aes(time, HR2_new, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
+removed <- ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
+
+raw <- ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
+
+ggpubr::ggarrange(raw, removed, labels = c("raw", "outliers removed" ))
+
+file_no_outlier$rowname <- row.names(file_no_outlier)
 
 ## Downsample
 ### You can use the code below. It is almost the same as the one in the video lecture.
@@ -121,14 +125,25 @@ d1 = file_no_outlier %>%
     time = mean(time,na.rm=T),
     HR1 = mean(HR1_new,na.rm=T),
     HR2 = mean(HR2_new,na.rm=T),
-    Resp1 = mean(resp1_new,na.rm=T),
-    Resp2 = mean(resp2_new,na.rm=T),
-    rowname = time[1]) #the index we use to put them back together 
+    Resp1 = mean(Resp1_new,na.rm=T),
+    Resp2 = mean(Resp2_new,na.rm=T),
+    rowname = rowname[1]) #the index we use to put them back together 
 
 ## Plot the downsampled data. You can use the code from the slides
+ggplot(data = d1) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
+filename <- "Study1_G2_T1_TurnTaking.csv"
 
 ## Now add the group, trial, condition to the cleaned up, scaled, downsampled data
+#parse filename; study, diagnosis, subject, trial
+vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+vars = as.data.frame(vars)
+names(vars) = c("filename", "study","group","trial", "condition")
+vars <- vars %>% 
+  mutate(group_id = paste0(study, group))
+
+#combining dataframes
+d1 <- cbind(d1, vars)
 
 ## Tip the info is in the file name
 
@@ -149,29 +164,95 @@ A couple of tips:
 ```{r}
 # Define a function running the loading, artifact removal, scaling, downsampling, info adding.
 
-data_preprocess <- function(filename, threshold = 2.5){
-  
+
+  # To be filled in
+data_preprocess123 <- function(filename){
+  myfiles = read_delim(paste0("DataPort4/",filename), delim = ",")
+  vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+  vars = as.data.frame(vars)
+  names(vars) = c("filename","study","group","trial", "condition")
+  vars <- vars %>% 
+    mutate(group_id = paste0(study, group))
+  myfiles$rowname <- row.names(myfiles)
+  myfiles = myfiles %>%
+    group(n = 100, method = 'greedy') %>%
+    dplyr::summarise(
+      time = mean(time,na.rm=T),
+      HR1 = mean(HR1,na.rm=T),
+      HR2 = mean(HR2,na.rm=T),
+      Resp1 = mean(Resp1,na.rm=T),
+      Resp2 = mean(Resp2,na.rm=T),
+      rowname = rowname[1])
+  myfiles <- cbind(myfiles, vars)
   # To be filled in
   
-  return(d1)
+  return(myfiles)
 
 }
 
 #  Identify all files to be read
 
 # Run the function on the whole dataset using map_df
+df123 <- list.files(path = "DataPort4/", pattern=".csv") %>% 
+  purrr::map_df(data_preprocess123)
 
-         
 # Now we need to make sure all the data are meaningful or something has to be removed
 # E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
 
-# plots plots plots
 
-# Remove bad data
+#Doing the same for study 4
+data_preprocess4 <- function(filename){
+  myfiles = read_delim(paste0("Study4Data/",filename), delim = ",")
+  vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
+  vars = as.data.frame(vars)
+  names(vars) = c("filename","study","group","trial", "condition")
+  vars <- vars %>% 
+    mutate(group_id = paste0(study, group))
+  myfiles$rowname <- row.names(myfiles)
+  myfiles = myfiles %>%
+    group(n = 100, method = 'greedy') %>%
+    dplyr::summarise(
+      time = mean(min,na.rm=T),
+      HR1 = mean(HR1,na.rm=T),
+      HR2 = mean(HR2,na.rm=T),
+      Resp1 = mean(Resp1,na.rm=T),
+      Resp2 = mean(Resp2,na.rm=T),
+      rowname = rowname[1])
+  myfiles <- cbind(myfiles, vars)
+  # To be filled in
+  
+  return(myfiles)
 
-# Save the data
+}
+
+# Run the function on the whole dataset using map_df
+df4 <- list.files(path = "Study4Data/", pattern=".csv") %>% 
+  purrr::map_df(data_preprocess4)
+
+
+# Now we need to make sure all the data are meaningful or something has to be removed
+# E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
+
+df <- rbind(df123, df4)
+
+threshold = 2.4
+df <- df %>% 
+  mutate(HR1 = removeOuts(df$HR1, threshold),
+        HR2 = removeOuts(df$HR2, threshold),
+        Resp1 = removeOuts(df$Resp1, threshold),
+        Resp2 = removeOuts(df$Resp2, threshold),
+        HR1_scaled = scale(df$HR1),
+        HR2_scaled = scale(df$HR2),
+        Resp1_scaled = scale(df$Resp1),
+        Resp2_scaled = scale(df$Resp2))
+       # time = ifelse(study == 3, time/100000, paste0(time))) %>% 
+
+  
+  filter(group_id != 27)
+
 
 ```
+
 
 ## Now we need to run some analysis
 
@@ -194,12 +275,28 @@ Bonus question: what if we include an additional layer? Is my heart rate just ad
 - to start answering this we can add a column indicating the previous change in hr in the other and one in respiration
 - we can then build on the previous models by also adding the previous change in the other
 
+If positive numbers == heartrate is rising.
+
 
 ```{r}
+df <- read_csv("port4_data.csv")
 
 # Generate a column for each: previous HR1, HR2, Resp1, Resp2. Tip: use the function Lag()
+df <- df %>% 
+  group_by(trial, group_id) %>% 
+  mutate(HR1_lag = lag(HR1_scaled),
+         HR2_lag = lag(HR2_scaled),
+         Resp1_lag = lag(Resp1_scaled),
+         Resp2_lag = lag(Resp2_scaled))
+
 # Generate a column for each: change in HR1, HR2, Resp1, Resp2
 
+df <- df %>% 
+  group_by(trial, group_id) %>% 
+  mutate(HR1_change = HR1_scaled - HR1_lag,
+         HR2_change = HR1_scaled - HR1_lag,
+         Resp1_change = Resp1_scaled - Resp1_lag,
+         Resp2_change = Resp1_scaled - Resp1_lag)
 
 # Make the data long, so we can analyze both participants at the same time. Tip: you can use the function gather () 
 ## N.B. This is a bit tricky and you might have to do it in several steps
@@ -207,12 +304,109 @@ Bonus question: what if we include an additional layer? Is my heart rate just ad
 # Set the most interesting contrast e.g. by defining synchronous or conversation as the baseline
 
 # Model change as a function of own and other previous state 
-
+??RHRV
 
 # Bonus points: Add to the previous model also change in the other to see whether my adaptation is influenced by the other's adaptation.
 
 ```
 
+Pivot the dataframe
+```{r}
+# #making the self and other HR column 
+# hr_self <- pivot_longer(df, c(HR1_scaled,HR2_scaled), names_to = "participant", values_to = "HR_self") 
+# hr_other <- pivot_longer(df, c(HR2_scaled,HR1_scaled), values_to = "HR_other") 
+# 
+# #adding to a main dataframe 
+# df_long <- cbind(hr_self, HR_other = hr_other$HR_other)
+# 
+# #checking it works 
+# head(df_long) 
+# 
+# #making the resp self and resp other data frames
+# resp_self <- pivot_longer(df, c(Resp1_scaled, Resp2_scaled), values_to = "Resp_self")
+# resp_other <- pivot_longer(df, c(Resp2_scaled, Resp1_scaled), values_to = "Resp_other")
+# 
+# #adding the pivotted columns to the main dataframe 
+# df_long <- cbind(df_long, 
+#                  Resp_self = resp_self$Resp_self, 
+#                  Resp_other = resp_other$Resp_other)
+# 
+# #checking it works
+# head(df_long)
+# 
+# 
+# #now we do it with hr change self and hr change other
+# hr_change <- pivot_longer(df, c(HR1_change, HR2_change), values_to = "HR_change_self")
+# hr_change_other <- pivot_longer(df, c(HR2_change, HR1_change), values_to = "HR_change_other")
+# 
+# #adding to df
+# df_long <- cbind(df_long, 
+#                  HR_change_self = hr_change$HR_change_self, 
+#                  HR_change_other = hr_change_other$HR_change_other)
+# 
+# #now we do it with resp change self and other
+# resp_change <- pivot_longer(df, c(Resp1_change, Resp2_change), values_to = "Resp_change_self")
+# resp_change_other <- pivot_longer(df, c(Resp2_change, Resp1_change), values_to = "Resp_change_other")
+# 
+# #adding to df
+# df_long <- cbind(df_long, 
+#                  Resp_change_self = resp_change$Resp_change_self, 
+#                  Resp_change_other = resp_change_other$Resp_change_other)
+# 
+# #checking it works
+# head(df_long)
+# 
+# 
+# #now it's time for hr lag self and hr lag other 
+# hr_lag <- pivot_longer(df, c(HR1_lag, HR2_lag), values_to = "HR_lag_self")
+# hr_lag_other <- pivot_longer(df, c(HR2_lag, HR1_lag), values_to = "HR_lag_other")
+# 
+# #adding to df
+# df_long <- cbind(df_long, 
+#                  HR_lag_self = hr_lag$HR_lag_self, 
+#                  HR_lag_other = hr_lag_other$HR_lag_other)
+# 
+# #and finally resp lag self and resp lag other 
+# resp_lag <- pivot_longer(df, c(Resp1_lag, Resp2_lag), values_to = "Resp_lag_self")
+# resp_lag_other <- pivot_longer(df, c(Resp2_lag, Resp1_lag), values_to = "Resp_lag_other")
+# 
+# #adding to df
+# df_long <- cbind(df_long, 
+#                  Resp_lag_self = resp_lag$Resp_lag_self, 
+#                  Resp_lag_other = resp_lag_other$Resp_lag_other)
+# 
+#   
+# 
+# #making a nice participant column with unique numbers for each participant 
+# df_long <- df_long %>% 
+#   mutate(participant = paste0(group_id, str_extract(participant, ("\\d"))))
+
+df_long <- read.csv("longboi.csv")
+
+```
+
+
+```{r}
+#set self-paced as a baseline
+df_long$condition <- as.factor(df_long$condition)
+df_long$condition <- relevel(df_long$condition, ref = "Synchronous")
+#check it works
+levels(df_long$condition)
+
+#subset data 
+small_subset <- subset(df_long, study=="3" & group_id == 37: 38: 39)
+
+#make a nice model that looks at stability and interdependence 
+HR_model <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+summary(HR_model0)
+
+#bonus question
+HR_model_change_other <- lmer(HR_change_self ~ 0 + HR_change_other + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+summary(HR_model_change_other)
+
+```
 
 ## Now we need to create control baselines.
 
@@ -226,10 +420,17 @@ Tip: sample() is your friend, but make sure to shuffle things within participant
 ```{r}
 
 # Create a shuffled dataset
+df_long$Type <- "Real" 
+
+df_sample <- df_long %>% group_by(participant, condition) %>%
+  mutate(HR_self = sample(HR_self), HR_other = sample(HR_other), Type = "Shuffled")
+
+
 # Concatenate it to the original dataset (and remember to have a column telling you which is which)
+df_shuffled <- bind_rows(df_long, df_sample)
 
 # Create the same models as in the previous chunk, but adding an interaction by shuffled vs. real
-
+HR_model_change_other <- lmer(HR_change_self ~ 0 + Shuffled*Real + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 ```
  
  
