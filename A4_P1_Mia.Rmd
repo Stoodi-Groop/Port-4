@@ -429,7 +429,6 @@ summary(resp_model1)
  - Per each real pair, identify at least one surrogate pair (matching one of the participants, with somebody doing the same task, but in a different pair)
 
 ```{r}
-
 # Identify unique pairs within a given study (to keep things manageable) and create list of possible surrogate pairs (e.g. individual 1 from pair 1 and individual 2 from pair 2)
 df_long <- df_long %>% 
   mutate(participant_id = participant,
@@ -479,7 +478,8 @@ hr_self <- pivot_longer(master_surrogate, c(HR1_scaled,HR2_scaled), names_to = "
 hr_other <- pivot_longer(master_surrogate, c(HR2_scaled,HR1_scaled), values_to = "HR_other") 
 
 #adding to a main dataframe 
-df_surrogate <- cbind(hr_self, HR_other = hr_other$HR_other)
+df_surrogate <- cbind(hr_self, 
+                      HR_other = hr_other$HR_other)
 
 
 #making the resp self and resp other data frames
@@ -487,7 +487,7 @@ resp_self <- pivot_longer(master_surrogate, c(Resp1_scaled, Resp2_scaled), value
 resp_other <- pivot_longer(master_surrogate, c(Resp2_scaled, Resp1_scaled), values_to = "Resp_other")
 
 #adding the pivotted columns to the main dataframe 
-df_surrogate <- cbind(df_long, 
+df_surrogate <- cbind(df_surrogate, 
                  Resp_self = resp_self$Resp_self, 
                  Resp_other = resp_other$Resp_other)
 
@@ -497,7 +497,7 @@ hr_change <- pivot_longer(master_surrogate, c(HR1_change, HR2_change), values_to
 hr_change_other <- pivot_longer(master_surrogate, c(HR2_change, HR1_change), values_to = "HR_change_other")
 
 #adding to df
-df_surrogate <- cbind(df_long, 
+df_surrogate <- cbind(df_surrogate, 
                  HR_change_self = hr_change$HR_change_self, 
                  HR_change_other = hr_change_other$HR_change_other)
 
@@ -506,7 +506,7 @@ resp_change <- pivot_longer(master_surrogate, c(Resp1_change, Resp2_change), val
 resp_change_other <- pivot_longer(master_surrogate, c(Resp2_change, Resp1_change), values_to = "Resp_change_other")
 
 #adding to df
-df_surrogate <- cbind(df_long, 
+df_surrogate <- cbind(df_surrogate, 
                  Resp_change_self = resp_change$Resp_change_self, 
                  Resp_change_other = resp_change_other$Resp_change_other)
 
@@ -516,7 +516,7 @@ hr_lag <- pivot_longer(master_surrogate, c(HR1_lag, HR2_lag), values_to = "HR_la
 hr_lag_other <- pivot_longer(master_surrogate, c(HR2_lag, HR1_lag), values_to = "HR_lag_other")
 
 #adding to df
-df_surrogate <- cbind(df_long, 
+df_surrogate <- cbind(df_surrogate, 
                  HR_lag_self = hr_lag$HR_lag_self, 
                  HR_lag_other = hr_lag_other$HR_lag_other)
 
@@ -525,7 +525,7 @@ resp_lag <- pivot_longer(master_surrogate, c(Resp1_lag, Resp2_lag), values_to = 
 resp_lag_other <- pivot_longer(master_surrogate, c(Resp2_lag, Resp1_lag), values_to = "Resp_lag_other")
 
 #adding to df
-df_surrogate <- cbind(df_long, 
+df_surrogate <- cbind(df_surrogate, 
                  Resp_lag_self = resp_lag$Resp_lag_self, 
                  Resp_lag_other = resp_lag_other$Resp_lag_other)
 
@@ -533,12 +533,18 @@ df_surrogate <- cbind(df_long,
 
 #making a nice participant column with unique numbers for each participant 
 df_surrogate <- df_surrogate %>% 
-  mutate(participant = paste0(group_id, str_extract(participant, ("\\d"))))
+  mutate(participant = str_extract(participant, ("\\d")),
+         participant_id = ifelse(participant == 1, 
+                                 paste0(str_extract(pair_id, ("\\d+")), participant), 
+                                 paste0(str_extract(new_pair_id, ("\\d+")), participant)))
 
 
 write_csv(df_surrogate, "surrogateboi.csv")
+```
 
 
+```{r}
+df <- read_csv("surrogateboi.csv")
 # Create models as in chunks above, but adding an interaction with the Real vs. Surrogate variable (exclude shuffled ones for simplicity)
 
 
