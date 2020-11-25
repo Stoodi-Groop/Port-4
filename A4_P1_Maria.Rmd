@@ -54,17 +54,17 @@ The data files can be found here: https://www.dropbox.com/sh/bvvk7t3fvsplh9o/AAD
 
 ```{r}
 # Load the libraries
-library(RHRV) 
-library(tidyverse)
-library(ggpubr)
-library(groupdata2)
+library(pacman)
+p_load(RHRV, tidyverse, ggpubr, groupdata2) 
+
 # Load the file
-file <- read.csv("Data/Study1_G2_T1_TurnTaking.csv")
+file <- read.csv("data/Study1_G2_T1_TurnTaking.csv")
+
 
 # Plot
-
 ggplot(data = file) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic()
 
+## Remove outliers
 
 ### Tip, check the function below. This is the function explained in the video lecture
 removeOuts <- function(ts,threshold){
@@ -74,8 +74,7 @@ removeOuts <- function(ts,threshold){
              (threshold*sd(ts,na.rm=T)))] = mean(ts,na.rm=T)
   return(ts)
 }
-
-threshold=2.5 # Default value at 2.5 sds from the mean. But you can increase it, if you want.
+threshold=2.4 # Default value at 2.5 sds from the mean. But you can increase it, if you want.
 
 file_no_outlier <- file
 
@@ -83,7 +82,6 @@ file_no_outlier$HR1 <- removeOuts(file_no_outlier$HR1, threshold)
 file_no_outlier$HR2 <- removeOuts(file_no_outlier$HR2, threshold)
 file_no_outlier$Resp1 <- removeOuts(file_no_outlier$Resp1, threshold)
 file_no_outlier$Resp2 <- removeOuts(file_no_outlier$Resp2, threshold)
-
 
 # Plot raw data against those with the artifacts removed
 removed <- ggplot(data = file_no_outlier) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
@@ -98,7 +96,6 @@ file_no_outlier$HR2_new <- scale(file_no_outlier$HR2)
 file_no_outlier$Resp1_new <- scale(file_no_outlier$Resp1)
 file_no_outlier$Resp2_new <- scale(file_no_outlier$Resp2)
 
-
 ### Tip: if scale() gives some issues, try the one below
 #z_scale <- function(column){
 #  column_c <- (column - mean(column)) / sd(column)
@@ -107,8 +104,10 @@ file_no_outlier$Resp2_new <- scale(file_no_outlier$Resp2)
 # Plot again to check how scaled data look like
 ggplot(data = file_no_outlier) + geom_path(aes(time, HR1_new, color = "P1")) + geom_path(aes(time, HR2_new, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
-## Downsample
+
 file_no_outlier$rowname <- row.names(file_no_outlier)
+
+## Downsample
 ### You can use the code below. It is almost the same as the one in the video lecture.
 d1 = file_no_outlier %>%
   group(n = 100, method = 'greedy') %>%
@@ -121,13 +120,11 @@ d1 = file_no_outlier %>%
     rowname = rowname[1]) #the index we use to put them back together 
 
 ## Plot the downsampled data. You can use the code from the slides
-
 ggplot(data = d1) + geom_path(aes(time, HR1, color = "P1")) + geom_path(aes(time, HR2, color = "P2")) + labs(x = "time", y = "HR") + theme_classic() 
 
-
+## Now add the group, trial, condition to the cleaned up, scaled, downsampled data
 filename <- "Study1_G2_T1_TurnTaking.csv"
 
-## Now add the group, trial, condition to the cleaned up, scaled, downsampled data
 #parse filename; study, diagnosis, subject, trial
 vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
 vars = as.data.frame(vars)
@@ -137,9 +134,9 @@ vars <- vars %>%
 
 #combining dataframes
 d1 <- cbind(d1, vars)
+
+
 ## Tip the info is in the file name
-
-
 
 
 ```
@@ -156,12 +153,19 @@ A couple of tips:
 - you need to make sure all the data are meaningful or something has to be removed. Plotting is your friend. E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
 
 
-
 ```{r}
 # Define a function running the loading, artifact removal, scaling, downsampling, info adding.
 
+# data_preprocess <- function(filename, threshold = 2.5){
+#   
+#   # To be filled in
+#   
+#   return(d1)
+# 
+# }
+
 data_preprocess <- function(filename, threshold){
-  myfiles = read_delim(paste0("Data/",filename), delim = ",")
+  myfiles = read_delim(paste0("data/",filename), delim = ",")
   vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
   vars = as.data.frame(vars)
   names(vars) = c("filename","study","group","trial", "condition")
@@ -177,32 +181,24 @@ data_preprocess <- function(filename, threshold){
       Resp1 = mean(Resp1,na.rm=T),
       Resp2 = mean(Resp2,na.rm=T),
       rowname = rowname[1])
- # myfiles$HR1 <- removeOuts(myfiles$HR1, threshold)
-  #myfiles$HR2 <- removeOuts(myfiles$HR2, threshold)
-  #myfiles$Resp1 <- removeOuts(myfiles$Resp1, threshold)
-  #myfiles$Resp2 <- removeOuts(myfiles$Resp2, threshold)
-  #myfiles$HR1_new <- scale(myfiles$HR1)
-  #myfiles$HR2_new <- scale(myfiles$HR2)
-  #myfiles$Resp1_new <- scale(myfiles$Resp1)
-  #myfiles$Resp2_new <- scale(myfiles$Resp2)
+  # myfiles$HR1 <- removeOuts(myfiles$HR1, threshold)
+  # myfiles$HR2 <- removeOuts(myfiles$HR2, threshold)
+  # myfiles$Resp1 <- removeOuts(myfiles$Resp1, threshold)
+  # myfiles$Resp2 <- removeOuts(myfiles$Resp2, threshold)
+  # myfiles$HR1_new <- scale(myfiles$HR1)
+  # myfiles$HR2_new <- scale(myfiles$HR2)
+  # myfiles$Resp1_new <- scale(myfiles$Resp1)
+  # myfiles$Resp2_new <- scale(myfiles$Resp2)
   myfiles <- cbind(myfiles, vars)
+  # To be filled in
   
   return(myfiles)
 
 }
 
 
-#  Identify all files to be read
-
-# Run the function on the whole dataset using map_df
-df123 <- list.files(path = "Data/", pattern=".csv") %>% 
-  purrr::map_df(data_preprocess, 2.5)
-
-
-# DOING IT ALL AGAIN FOR STUDY 4 BECAUSE THEIR TIME SCALES ARE STUUUUPID 
-
 data_preprocess4 <- function(filename, threshold){
-  myfiles = read_delim(paste0("Data4/",filename), delim = ",")
+  myfiles = read_delim(paste0("data4/",filename), delim = ",")
   vars = str_match(filename,"Study(.*?)_G(.*?)_T(.*?)_(.*?).csv") 
   vars = as.data.frame(vars)
   names(vars) = c("filename","study","group","trial", "condition")
@@ -218,48 +214,66 @@ data_preprocess4 <- function(filename, threshold){
       Resp1 = mean(Resp1,na.rm=T),
       Resp2 = mean(Resp2,na.rm=T),
       rowname = rowname[1])
+  # myfiles$HR1 <- removeOuts(myfiles$HR1, threshold)
+  # myfiles$HR2 <- removeOuts(myfiles$HR2, threshold)
+  # myfiles$Resp1 <- removeOuts(myfiles$Resp1, threshold)
+  # myfiles$Resp2 <- removeOuts(myfiles$Resp2, threshold)
+  # myfiles$HR1_new <- scale(myfiles$HR1)
+  # myfiles$HR2_new <- scale(myfiles$HR2)
+  # myfiles$Resp1_new <- scale(myfiles$Resp1)
+  # myfiles$Resp2_new <- scale(myfiles$Resp2)
   myfiles <- cbind(myfiles, vars)
-
+  # To be filled in
+  
   return(myfiles)
 
 }
 
-
 #  Identify all files to be read
 
 # Run the function on the whole dataset using map_df
-df4 <- list.files(path = "Data4/", pattern=".csv") %>% 
+df123 <- list.files(path = "data/", pattern=".csv") %>% 
+  purrr::map_df(data_preprocess, 2.5)
+
+df4 <- list.files(path = "data4/", pattern=".csv") %>% 
   purrr::map_df(data_preprocess4, 2.5)
 
-
-
-
+#make collected df
 df <- rbind(df123, df4)
 
-#This is only NA's there we remove it
-df <- df %>% filter(group_id != 27)
+#exclude id 27 (because it returns NaN)
+df <- df %>% 
+  filter(group_id != 27)
 
-#Removing outliers and scaling
-threshold = 2.4
+
+# Now we need to make sure all the data are meaningful or something has to be removed
+# E.g. "Study1_G1_T1_Synchronous" has one bad respiration signal. We could replace it with NAs
+
+# plots plots plots
+
+# Remove other bad data
+threshold <-  2.4 #redundant beacuse it is already defined but hey
 df <- df %>% 
   mutate(HR1 = removeOuts(df$HR1, threshold),
         HR2 = removeOuts(df$HR2, threshold),
         Resp1 = removeOuts(df$Resp1, threshold),
         Resp2 = removeOuts(df$Resp2, threshold),
-        HR1_scaled = scale(df$HR1),
-        HR2_scaled = scale(df$HR2),
-        Resp1_scaled = scale(df$Resp1),
-        Resp2_scaled = scale(df$Resp2),
-        time = ifelse(study == 3, time/100000, paste0(time)))
+        HR1_new = scale(df$HR1),
+        HR2_new = scale(df$HR2),
+        Resp1_new = scale(df$Resp1),
+        Resp2_new = scale(df$Resp2),
+        time = ifelse(study == 3, time/60000, paste0(time))) 
+
 
 
 # Save the data
-write_csv(df, "port4_data.csv")
+#write_csv(df, "port4_data.csv")
 
+#load data
+df <- read_csv("port4_data.csv")
 
-
-# plots plots plots
-
+#rename the _new columns to _scaled
+colnames(df)[14:17] <- c("HR1_scaled", "HR2_scaled", "Resp1_scaled", "Resp2_scaled")
 
 ```
 
@@ -286,9 +300,10 @@ Bonus question: what if we include an additional layer? Is my heart rate just ad
 
 
 ```{r}
-df <- read_csv("port4_data.csv")
-
 # Generate a column for each: previous HR1, HR2, Resp1, Resp2. Tip: use the function Lag()
+# Generate a column for each: change in HR1, HR2, Resp1, Resp2
+
+#make column where the previous/lagged HR and Resp is shown
 df <- df %>% 
   group_by(trial, group_id) %>% 
   mutate(HR1_lag = lag(HR1_scaled),
@@ -296,27 +311,28 @@ df <- df %>%
          Resp1_lag = lag(Resp1_scaled),
          Resp2_lag = lag(Resp2_scaled))
 
-# Generate a column for each: change in HR1, HR2, Resp1, Resp2
-
+#make column for the change from the previous
 df <- df %>% 
   mutate(HR1_change = HR1_scaled - HR1_lag,
          HR2_change = HR2_scaled - HR2_lag,
-         Resp1_change = Resp1_scaled - Resp1_lag,
+         Resp1_change = Resp1_scaled - Resp2_lag,
          Resp2_change = Resp2_scaled - Resp2_lag)
-
 ```
 
+Change format of the data
 
 ```{r}
+# Make the data long, so we can analyze both participants at the same time. Tip: you can use the function gather () 
+## N.B. This is a bit tricky and you might have to do it in several steps
+
+
 #making the self and other HR column 
 hr_self <- pivot_longer(df, c(HR1_scaled,HR2_scaled), names_to = "participant", values_to = "HR_self") 
 hr_other <- pivot_longer(df, c(HR2_scaled,HR1_scaled), values_to = "HR_other") 
 
 #adding to a main dataframe 
-df_long <- cbind(hr_self, HR_other = hr_other$HR_other)
+df_long <- cbind(hr_self, HR_other = hr_other$HR_other) #add column to whole dataframe
 
-#checking it works 
-head(df_long) 
 
 #making the resp self and resp other data frames
 resp_self <- pivot_longer(df, c(Resp1_scaled, Resp2_scaled), values_to = "Resp_self")
@@ -326,9 +342,6 @@ resp_other <- pivot_longer(df, c(Resp2_scaled, Resp1_scaled), values_to = "Resp_
 df_long <- cbind(df_long, 
                  Resp_self = resp_self$Resp_self, 
                  Resp_other = resp_other$Resp_other)
-
-#checking it works
-head(df_long)
 
 
 #now we do it with hr change self and hr change other
@@ -349,8 +362,6 @@ df_long <- cbind(df_long,
                  Resp_change_self = resp_change$Resp_change_self, 
                  Resp_change_other = resp_change_other$Resp_change_other)
 
-#checking it works
-head(df_long)
 
 
 #now it's time for hr lag self and hr lag other 
@@ -378,42 +389,50 @@ df_long <- df_long %>%
   mutate(participant = paste0(group_id, str_extract(participant, ("\\d"))))
 
 
-write_csv(df_long, "longboi.csv")
+#write_csv(df_long, "longdf.csv")
+
+
+df_long <- read_csv("longdf.csv")
 ```
 
 
 ```{r}
-df_long <- read_csv("longboi.csv")
 # Set the most interesting contrast e.g. by defining synchronous or conversation as the baseline
 df_long$condition <- as.factor(df_long$condition)
 
-df_long$condition <- relevel(df_long$condition, ref = "Synchronous")
-
+#see levels for condition
 levels(df_long$condition)
 
-# Model change as a function of own and other previous state HR!!!
-library(lme4)
+#relevel with synchronous as one
+df_long$condition <- relevel(df_long$condition, ref = "Synchronous")
 
+
+# Model change as a function of own and other previous state 
+#library(lme4)
 library(lmerTest)
 
-HR_model0 <- lmerTest::lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
-summary(HR_model0)
+#small_subset <- subset(df_long, study=="3" & group_id == 37:39)
+
+HR_model <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study == "3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+HR_model_change_other <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition + HR_change_other + (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study == "3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+#fails to converge?
+
+summary(HR_model)
+summary(HR_model_change_other)
+
+#the same but for respiration 
+Resp_model <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study == "3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+Resp_model_change_other <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition + Resp_change_other + (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study == "3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+#fails to converge?
+
+summary(Resp_model)
+summary(Resp_model_change_other)
 
 # Bonus points: Add to the previous model also change in the other to see whether my adaptation is influenced by the other's adaptation.
 
-HR_model_bonus <- lmerTest::lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition + HR_change_other +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-
-summary(HR_model_bonus)
-
-# Respiration 
-Resp_model0 <- lmerTest::lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition +  (0 + condition | participant) + (0 + condition | group_id), df_long, REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-
-summary(Resp_model0)
-
-Resp_model_bonus <- lmerTest::lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition + Resp_change_other + (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-
-summary(Resp_model_bonus)
 ```
 
 
@@ -427,23 +446,24 @@ Shuffled controls break the temporal dependencies of time-series by shuffling th
 Tip: sample() is your friend, but make sure to shuffle things within participant/condition and not throughout the whole dataset
  
 ```{r}
+
 # Create a shuffled dataset
 df_long$Type <- "Real" 
 
-df_sample <- df_long %>% 
-  group_by(participant, condition) %>%
-  mutate(HR_self = sample(HR_self), HR_other = sample(HR_other),
-         Resp_self = sample(Resp_self), Resp_other = sample(Resp_other), Type = "Shuffled")
+df_sample <- df_long %>% group_by(participant, condition) %>%
+  mutate(HR_self = sample(HR_self), HR_other = sample(HR_other), Type = "Shuffled")
 
 
 # Concatenate it to the original dataset (and remember to have a column telling you which is which)
 df_shuffled <- bind_rows(df_long, df_sample)
 
 # Create the same models as in the previous chunk, but adding an interaction by shuffled vs. real
-HR_model1 <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition : Type +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_shuffled, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+HR_model_shuffled <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition : Type + (0 + condition | participant) + (0 + condition | group_id),  subset(df_shuffled, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
+resp_model_shuffled <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition : Type + (0 + condition | participant) + (0 + condition | group_id),  subset(df_shuffled, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
-resp_model1 <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition : Type + (0 + condition | participant) + (0 + condition | group_id),  subset(df_shuffled, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+summary(HR_model_shuffled)
+summary(resp_model_shuffled)
 
 ```
  
@@ -454,8 +474,11 @@ resp_model1 <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition 
 ```{r}
 
 # Identify unique pairs within a given study (to keep things manageable) and create list of possible surrogate pairs (e.g. individual 1 from pair 1 and individual 2 from pair 2)
+#expand.grid()
+
 
 # Starting from the wide format, create "surrogate" dataset with the data from surrogate pairs
+
 
 # Make it into long format
 
