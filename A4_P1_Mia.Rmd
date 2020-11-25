@@ -430,18 +430,20 @@ summary(resp_model1)
 
 ```{r}
 # Identify unique pairs within a given study (to keep things manageable) and create list of possible surrogate pairs (e.g. individual 1 from pair 1 and individual 2 from pair 2)
+
+#his has nothing to do with surrogate, just a thing i wanted to be added
 df_long <- df_long %>% 
   mutate(participant_id = participant,
          participant = str_extract(df_long$participant, "\\d$"))
 
+#here we identify unique combinations of pairs and conditions
 pairs <- df_long %>% 
   distinct(group_id, condition)
 
+#here we mke new combinations of pairs - so the first pair column will specify the participant 1 and the second group id will specify the participant 2
 shuffled_pairs <- pairs %>% 
   group_by(condition) %>%
   mutate(new_pair = sample(group_id),
-         participant1 = paste0(group_id, 1),
-         participant2 = paste0(new_pair, 2),
          pair_id = paste0(condition, group_id),
          new_pair_id = paste0(condition, new_pair)) %>% 
   ungroup() %>% 
@@ -449,25 +451,31 @@ shuffled_pairs <- pairs %>%
 
 # Starting from the wide format, create "surrogate" dataset with the data from surrogate pairs
 
+#here we select our data from the wide format column 
+
 p1 <- df %>% 
   ungroup() %>% 
-  select(group_id, condition, starts_with(c("HR1","Resp1"))) %>% 
-  mutate(pair_id = paste0(condition, group_id)) %>% 
+  select(group_id, condition, starts_with(c("HR1","Resp1"))) %>% #we want all the participant 1's
+  mutate(pair_id = paste0(condition, group_id)) %>% #a column that allows us to later merge/join the data with the new pairs
   select(starts_with(c("HR1","Resp1")), pair_id)
 
+#
 p2 <- df %>% 
   ungroup() %>% 
-  select(group_id, condition, starts_with(c("HR2","Resp2"))) %>% 
-  mutate(new_pair_id = paste0(condition, group_id)) %>% 
+  select(group_id, condition, starts_with(c("HR2","Resp2"))) %>% #and we want all the participant 2's 
+  mutate(new_pair_id = paste0(condition, group_id)) %>% #same column to allow merge/join 
   select(starts_with(c("HR2","Resp2")), new_pair_id)
 
+#here we take the shuffled_pairs and put in the data from our participant 1 df by specifying which group id's to join with (the column that denotes the participant 1 group id)
 surrogate <- shuffled_pairs %>% 
   left_join(p1, by = "pair_id")
 
+#here we take the participant 2 data and put into our shuffled_pairs but with the other group id column
 surrogate_p2 <- shuffled_pairs %>% 
   left_join(p2, by = "new_pair_id") %>% 
   select(starts_with(c("HR2", "Resp2")))
 
+#becuase we separated all the participant 1's and 2's, we can now combine them - and they will be mathced according to the new pairs we created with shuffled_pairs 
 master_surrogate <- surrogate %>% 
   cbind(surrogate_p2)
 
@@ -551,66 +559,6 @@ df <- read_csv("surrogateboi.csv")
 
 ```
 
-```{r}
-#Identify unique pairs within a given study (to keep things manageable) and create list of possible surrogate pairs (e.g. individual 1 from pair 1 and individual 2 from pair 2)
-# Find unique participants
-distinct_pairs <- df_long %>% 
-  distinct(group_id, condition)
-
-shuffled_pairs <- distinct_pairs %>% 
-  group_by(condition) %>% 
-  sample_frac() %>% 
-  rename(shuffled_pair = group_id) %>% 
-  arrange(condition) %>% 
-  bind_cols(arrange(distinct_pairs, condition)) %>% 
-  mutate(shuffled_person = paste0(shuffled_pair, "_1"), 
-         join_pair_id = paste0(condition...1, group_id), 
-         shuffled_person = paste0(condition...1, shuffled_person)) 
-  select(join_pair_id, shuffled_person)
-
-shuffled_pairs
-?sample_frac
-# Create models as in chunks above, but adding an interaction with the Real vs. Surrogate variable (exclude shuffled ones for simplicity)
-df <-  df %>% 
-  mutate(participant_id = participant,
-         participant = str_extract(df$participant, "\\d$"))
-
-new_df <- df_long %>%
-  mutate(join_pair_id = paste0(condition, group_id))%>% 
-  left_join(shuffled_pairs) %>% 
-  mutate(join_key = paste0(shuffled_person, participant, .groups)) 
-  distinct(join_key, .keep_all = T)
-
-df_join <- df_long %>% 
-  mutate(join_key = paste0(condition, participant_id, .groups)) %>% 
-  distinct(join_key, .keep_all = T) %>% 
-  select(join_key, HR_shuffled = HR_self)
-
-
-
-data_surrogate <- new_df %>% 
-  left_join(df_join)  
-
-master_data <- data_surrogate %>% 
-  select(HR_change_self, HR_change_other, HR_self, HR_other, 
-         Resp_self, Resp_other, Resp_change_self, Resp_change_other,
-         participant_id, condition) %>% 
-  mutate(is_surrogate = F)
-
-surrogate_master_data <- master_data_surrogate %>% 
-  select(delta_HR, HR_self, HR_other=HR_shuffled, participant_id, condition) %>% 
-  mutate(is_surrogate = T)
-
-joined_data <- real_master_data %>% 
-  bind_rows(surrogate_master_data)
-
-
-test_lm_surrogate <- lm(delta_HR ~ 0 + (HR_self + HR_shuffled):condition, filter(master_data_surrogate, participant_id == "1_2_2"))
-
-test_lmer_surrogate <- lmerTest::lmer(delta_HR ~ 1 + (HR_self + HR_other):condition:is_surrogate + (1|participant_id), joined_data)
-
-summary(test_lmer_surrogate)
-``` 
 
 ### Effects of respiration coordination on heart rate coordination
  - describe how you would test those.
