@@ -365,23 +365,23 @@ write_csv(df_long, "longboi.csv")
 df_long <- read_csv("longboi.csv")
 
 # Set the most interesting contrast e.g. by defining synchronous or conversation as the baseline
-df$condition <- as.factor(df$condition)
+df_long$condition <- as.factor(df_long$condition)
 
 levels(df$condition)
 
-df$condition <- relevel(df$condition, ref = "Synchronous")
+df_long$condition <- relevel(df_long$condition, ref = "Synchronous")
 
 # Model change as a function of own and other previous state 
-HR_model0 <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+HR_model0 <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
-resp_model0 <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+resp_model0 <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
 summary(HR_model0)
 summary(resp_model0)
 
 # Bonus points: Add to the previous model also change in the other to see whether my adaptation is influenced by the other's adaptation.
-HR_model_change_other <- lmer(HR_change_self ~ 0 + HR_change_other + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-Resp_model_change_other <- lmer(Resp_change_self ~ 0 +  (Resp_self + Resp_other) : condition +  Resp_change_other + (0 + condition | participant) + (0 + condition | group_id),  subset(df, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+HR_model_change_other <- lmer(HR_change_self ~ 0 + HR_change_other + (HR_self + HR_other) : condition +  (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+Resp_model_change_other <- lmer(Resp_change_self ~ 0 +  (Resp_self + Resp_other) : condition +  Resp_change_other + (0 + condition | participant) + (0 + condition | group_id),  subset(df_long, study=="3"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
 
 summary(HR_model_change_other)
@@ -403,15 +403,15 @@ Tip: sample() is your friend, but make sure to shuffle things within participant
 ```{r}
 
 # Create a shuffled dataset
-df$Type <- "Real" 
+df_long$Type <- "Real" 
 
-df_sample <- df %>% group_by(participant, condition) %>%
+df_sample <- df_long %>% group_by(participant, condition) %>%
   mutate(HR_self = sample(HR_self), 
          HR_other = sample(HR_other),
          Type = "Shuffled")
 
 # Concatenate it to the original dataset (and remember to have a column telling you which is which)
-df_shuffled <- bind_rows(df, df_sample)
+df_shuffled <- bind_rows(df_long, df_sample)
 
 
 # Create the same models as in the previous chunk, but adding an interaction by shuffled vs. real
@@ -431,7 +431,7 @@ summary(resp_model1)
 ```{r}
 # Identify unique pairs within a given study (to keep things manageable) and create list of possible surrogate pairs (e.g. individual 1 from pair 1 and individual 2 from pair 2)
 
-#his has nothing to do with surrogate, just a thing i wanted to be added
+#this has nothing to do with surrogate, just a thing i wanted to be added
 df_long <- df_long %>% 
   mutate(participant_id = participant,
          participant = str_extract(df_long$participant, "\\d$"))
@@ -440,7 +440,7 @@ df_long <- df_long %>%
 pairs <- df_long %>% 
   distinct(group_id, condition)
 
-#here we mke new combinations of pairs - so the first pair column will specify the participant 1 and the second group id will specify the participant 2
+#here we make new combinations of pairs - so the first pair column will specify the participant 1's group id and the second pair colum will specify the participant 2 group id
 shuffled_pairs <- pairs %>% 
   group_by(condition) %>%
   mutate(new_pair = sample(group_id),
@@ -455,7 +455,7 @@ shuffled_pairs <- pairs %>%
 
 p1 <- df %>% 
   ungroup() %>% 
-  select(group_id, condition, starts_with(c("HR1","Resp1"))) %>% #we want all the participant 1's
+  select(group_id, condition, starts_with(c("HR1","Resp1"))) %>% #we want all the participant 1 data
   mutate(pair_id = paste0(condition, group_id)) %>% #a column that allows us to later merge/join the data with the new pairs
   select(starts_with(c("HR1","Resp1")), pair_id)
 
@@ -475,11 +475,14 @@ surrogate_p2 <- shuffled_pairs %>%
   left_join(p2, by = "new_pair_id") %>% 
   select(starts_with(c("HR2", "Resp2")))
 
-#becuase we separated all the participant 1's and 2's, we can now combine them - and they will be mathced according to the new pairs we created with shuffled_pairs 
+#becuase we separated all the participant 1's and 2's, we can now combine them - and they will be matched according to the new pairs we created with shuffled_pairs 
 master_surrogate <- surrogate %>% 
   cbind(surrogate_p2)
+```
 
-# Make it into long format
+
+```{r}
+# Make it into long format - same code as earlier just edited to use the surrogate data now
 
 #making the self and other HR column 
 hr_self <- pivot_longer(master_surrogate, c(HR1_scaled,HR2_scaled), names_to = "participant", values_to = "HR_self") 
@@ -552,10 +555,44 @@ write_csv(df_surrogate, "surrogateboi.csv")
 
 
 ```{r}
-df <- read_csv("surrogateboi.csv")
+df_sur <- read_csv("surrogateboi.csv")
+
+conditions <- unique(df_long$condition)
+conditions
+
+#adding column to specify whether it is surrogate or real 
+df_sur$Type = "Surrogate"
+df_sur <- df_sur %>% 
+  mutate(group_id = paste0(str_extract(df_sur$pair_id, "\\d+"), str_extract(df_sur$new_pair_id, "\\d+")),
+         condition = str_extract(df_sur$pair_id, "[A-z]+"))
+
+#making subsets to row bind
+df_sur_subset <- df_sur %>% 
+  select(starts_with("HR"), starts_with("Resp"), group_id, participant_id, participant, Type, condition)
+df_long_subset <- df_long %>% 
+  select(starts_with("HR"), starts_with("Resp"), group_id, participant_id, participant, Type, condition)
+
+#making a master df
+master_df <- rbind(df_long_subset, df_sur_subset)
+str(master_df)
+
+master_df <- master_df %>% 
+  rename(surrogatetype = Type) 
+
+master_df <- master_df %>% 
+  mutate(group_id = as.factor(group_id),
+         participant_id = as.factor(participant_id),
+         participant = as.factor(participant),
+         surrogatetype = as.factor(surrogatetype),
+         condition = as.factor(condition))
+
+
 # Create models as in chunks above, but adding an interaction with the Real vs. Surrogate variable (exclude shuffled ones for simplicity)
+HR_model_surrogate <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : surrogatetype + (0 | participant) + (0 | group_id), subset(master_df, condition=="Synchronous"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
+summary(HR_model_Type)
 
+resp_model_surrogate <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition : surrogatetype + (0 + condition | participant) + (0 + condition | group_id),  subset(master_df, condition=="Synchronous"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
 ```
 
