@@ -588,11 +588,14 @@ master_df <- master_df %>%
 
 
 # Create models as in chunks above, but adding an interaction with the Real vs. Surrogate variable (exclude shuffled ones for simplicity)
-HR_model_surrogate <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : surrogatetype + (0 | participant) + (0 | group_id), subset(master_df, condition=="Synchronous"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+HR_model_surrogate <- lmer(HR_change_self ~ 0 + (HR_self + HR_other) : surrogatetype + (1 | participant) + (1 | group_id), subset(master_df, condition=="TurnTaking"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
-summary(HR_model_Type)
+summary(HR_model_surrogate)
 
-resp_model_surrogate <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : condition : surrogatetype + (0 + condition | participant) + (0 + condition | group_id),  subset(master_df, condition=="Synchronous"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+resp_model_surrogate <- lmer(Resp_change_self ~ 0 + (Resp_self + Resp_other) : surrogatetype + (1 | participant) + (1 | group_id),  subset(master_df, condition=="Synchronous"), REML=F,control = lmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+summary(resp_model_surrogate)
+
 
 ```
 
